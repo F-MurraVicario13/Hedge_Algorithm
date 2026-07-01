@@ -1,0 +1,22 @@
+[project]
+name = "hedge-polymarket-backtest"
+version = "0.1.0"
+description = "Backtester for a Polymarket underdog-insurance / mean-reversion strategy"
+requires-python = ">=3.9"
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest"]
+
+[project.scripts]
+backtest = "backtester.cli:main"
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["backtester*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
