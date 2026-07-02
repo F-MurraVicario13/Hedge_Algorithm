@@ -115,3 +115,20 @@ def test_iter_closed_markets_stops_on_empty_page(tmp_path, monkeypatch):
 
     results = list(gamma.iter_closed_markets(cache, page_size=100))
     assert results == []
+
+
+def test_iter_closed_markets_stops_on_offset_limit_error(tmp_path, monkeypatch):
+    cache = DiskCache(cache_dir=tmp_path, min_interval=0.0)
+
+    def fake_request(path, params):
+        raise RuntimeError(
+            "Gamma request failed for https://gamma-api.polymarket.com/markets?"
+            "closed=true&limit=100&offset=2100 with HTTP 422 Unprocessable Entity\n"
+            "Response body:\n"
+            "{\"type\":\"validation error\",\"error\":\"offset too large, use /markets/keyset for deeper pagination\"}"
+        )
+
+    monkeypatch.setattr(gamma, "_request", fake_request)
+
+    results = list(gamma.iter_closed_markets(cache, page_size=100))
+    assert results == []

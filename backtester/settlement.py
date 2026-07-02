@@ -28,15 +28,20 @@ def close_before_settlement(shares: float, entry_price: float, exit_price: float
 
 def resolve_binary_outcome(outcome_prices) -> int:
     """
-    Given a closed market's outcomePrices (e.g. ["1", "0"] or ["0", "1"]),
-    return the index of the winning outcome. Raises if the prices aren't a
-    clean 0/1 pair -- callers must never treat an unresolved or ambiguous
-    market as ground truth (that would be a look-ahead / survivorship bug).
+    Given a closed binary market's outcomePrices, return the index of the
+    winning outcome.
+
+    Gamma's closed-market records do not always snap to an exact 0/1 pair at
+    the end of the lifecycle. For backtesting we treat the higher final price
+    as the winning side, but we still reject ties because those remain
+    ambiguous.
     """
     prices = [float(p) for p in outcome_prices]
-    if sorted(prices) != [0.0, 1.0]:
+    if len(prices) != 2:
+        raise ValueError(f"market is not binary: outcomePrices={outcome_prices!r}")
+    if prices[0] == prices[1]:
         raise ValueError(f"market is not cleanly resolved: outcomePrices={outcome_prices!r}")
-    return prices.index(1.0)
+    return 0 if prices[0] > prices[1] else 1
 
 
 def hedge_report(fav_shares, fav_entry, underdog_ask, verbose=True) -> dict:

@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 import urllib.parse
 import urllib.request
+from urllib.error import HTTPError
 from typing import Any, Iterator, Optional
 
 from backtester.data.cache import DiskCache
@@ -27,8 +28,19 @@ def _request(path: str, params: dict) -> Any:
     """Issue the actual HTTP GET. Isolated so tests can monkeypatch just this."""
     url = f"{GAMMA}{path}?" + urllib.parse.urlencode(params)
     req = urllib.request.Request(url, headers=_HEADERS)
-    with urllib.request.urlopen(req, timeout=20) as r:
-        return json.loads(r.read().decode())
+    try:
+        with urllib.request.urlopen(req, timeout=20) as r:
+            return json.loads(r.read().decode())
+    except HTTPError as e:
+        body = ""
+        try:
+            body = e.read().decode(errors="replace")
+        except Exception:
+            pass
+        raise RuntimeError(
+            f"Gamma request failed for {url} with HTTP {e.code} {e.reason}"
+            + (f"\nResponse body:\n{body}" if body else "")
+        ) from e
 
 
 def _get(cache: DiskCache, path: str, params: dict) -> Any:
@@ -110,7 +122,12 @@ def iter_closed_markets(
     offset = 0
     pages = 0
     while max_pages is None or pages < max_pages:
-        page = _get(cache, "/markets", {**params, "offset": offset})
+        try:
+            page = _get(cache, "/markets", {**params, "offset": offset})
+        except RuntimeError as e:
+            if "offset too large" in str(e):
+                return
+            raise
         if not page:
             return
         for m in page:

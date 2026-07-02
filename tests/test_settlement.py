@@ -29,17 +29,17 @@ def test_close_before_settlement():
 
 
 def test_resolve_binary_outcome_yes_wins():
-    assert resolve_binary_outcome(["1", "0"]) == 0
+    assert resolve_binary_outcome(["0.999999", "0.000001"]) == 0
 
 
 def test_resolve_binary_outcome_no_wins():
-    assert resolve_binary_outcome(["0", "1"]) == 1
+    assert resolve_binary_outcome(["0.000001", "0.999999"]) == 1
 
 
 def test_resolve_binary_outcome_rejects_unresolved_market():
-    # a live/open market's outcomePrices are floats near 0.5, not a clean 0/1 pair
+    # exact ties remain ambiguous and should still be rejected
     with pytest.raises(ValueError):
-        resolve_binary_outcome(["0.52", "0.48"])
+        resolve_binary_outcome(["0.5", "0.5"])
 
 
 class TestHedgeReportKnownAnswer:

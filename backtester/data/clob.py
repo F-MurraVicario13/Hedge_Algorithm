@@ -7,6 +7,7 @@ from __future__ import annotations
 import json
 import urllib.parse
 import urllib.request
+from urllib.error import HTTPError, URLError
 from typing import Any, Optional
 
 from backtester.data.cache import DiskCache
@@ -22,8 +23,18 @@ def _request(params: dict) -> Any:
     """Issue the actual HTTP GET. Isolated so tests can monkeypatch just this."""
     url = f"{CLOB}/prices-history?" + urllib.parse.urlencode(params)
     req = urllib.request.Request(url, headers=_HEADERS)
-    with urllib.request.urlopen(req, timeout=20) as r:
-        return json.loads(r.read().decode())
+    try:
+        with urllib.request.urlopen(req, timeout=5) as r:
+            return json.loads(r.read().decode())
+    except (HTTPError, URLError) as e:
+        raise RuntimeError(f"CLOB request failed for {url}: {e}") from e
+
+
+def history_cache_key(clob_token_id: str, interval: str = "max", fidelity: Optional[int] = None) -> str:
+    params: dict = {"market": clob_token_id, "interval": interval}
+    if fidelity is not None:
+        params["fidelity"] = fidelity
+    return f"clob_prices_history_{urllib.parse.urlencode(sorted(params.items()))}"
 
 
 def fetch_price_history(
@@ -40,7 +51,7 @@ def fetch_price_history(
     if fidelity is not None:
         params["fidelity"] = fidelity
 
-    key = f"clob_prices_history_{urllib.parse.urlencode(sorted(params.items()))}"
+    key = history_cache_key(clob_token_id, interval=interval, fidelity=fidelity)
     data = cache.get_json(key, lambda: _request(params))
 
     history = [(int(pt["t"]), float(pt["p"])) for pt in data.get("history", [])]

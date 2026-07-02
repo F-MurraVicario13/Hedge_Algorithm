@@ -41,6 +41,10 @@ class DiskCache:
         path.write_text(json.dumps(data), encoding="utf-8")
         return data
 
+    def has_json(self, key: str) -> bool:
+        """Return True when the cache already contains a JSON blob for `key`."""
+        return self._path_for(key).exists()
+
     def _throttle(self) -> None:
         elapsed = time.monotonic() - self._last_request_ts
         wait = self.min_interval - elapsed
