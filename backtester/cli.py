@@ -20,7 +20,7 @@ from typing import Dict, List, Optional, Tuple
 
 from backtester.costs.model import CostModel
 from backtester.data.cache import DEFAULT_CACHE_DIR, DiskCache
-from backtester.data.clob import fetch_price_history, history_cache_key
+from backtester.data.clob import fetch_price_history
 from backtester.data.gamma import iter_closed_markets
 from backtester.engine.backtest import MarketData, simulate_all
 from backtester.engine.metrics import (
@@ -95,7 +95,6 @@ def build_market_dataset(
         "unresolved": 0,
         "too_short_history": 0,
         "history_fetch_failed": 0,
-        "history_not_cached": 0,
     }
 
     for raw in iter_closed_markets(cache, extra_params=extra, page_size=100):
@@ -111,11 +110,6 @@ def build_market_dataset(
             continue
 
         tok0, tok1 = raw["clob_token_ids"]
-        key0 = history_cache_key(tok0, interval=interval, fidelity=fidelity)
-        key1 = history_cache_key(tok1, interval=interval, fidelity=fidelity)
-        if not cache.has_json(key0) or not cache.has_json(key1):
-            skipped["history_not_cached"] += 1
-            continue
         try:
             hist0 = fetch_price_history(cache, tok0, interval=interval, fidelity=fidelity)
             hist1 = fetch_price_history(cache, tok1, interval=interval, fidelity=fidelity)
