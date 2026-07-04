@@ -42,6 +42,10 @@ class DiskCache:
         return data
 
     def has_json(self, key: str) -> bool:
+        """Return True when a cached JSON blob already exists for `key`."""
+        return self._path_for(key).exists()
+
+    def has_json(self, key: str) -> bool:
         """Return True when the cache already contains a JSON blob for `key`."""
         return self._path_for(key).exists()
 

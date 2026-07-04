@@ -36,6 +36,7 @@ def _fake_raw_market(slug, tok0, tok1, outcome_prices, end_date="2026-01-01"):
 
 def test_build_market_dataset_skips_non_binary_and_unresolved(tmp_path, monkeypatch):
     cache = DiskCache(cache_dir=tmp_path, min_interval=0.0)
+    monkeypatch.setattr(DiskCache, "has_json", lambda self, key: True)
 
     raw_markets = [
         _fake_raw_market("good", "tok-a", "tok-b", [1.0, 0.0]),
@@ -58,6 +59,7 @@ def test_build_market_dataset_skips_non_binary_and_unresolved(tmp_path, monkeypa
 
 def test_build_market_dataset_respects_limit(tmp_path, monkeypatch):
     cache = DiskCache(cache_dir=tmp_path, min_interval=0.0)
+    monkeypatch.setattr(DiskCache, "has_json", lambda self, key: True)
     raw_markets = [_fake_raw_market(f"m{i}", f"a{i}", f"b{i}", [1.0, 0.0]) for i in range(5)]
     monkeypatch.setattr(cli, "iter_closed_markets",
                          lambda cache, extra_params=None, page_size=100, max_pages=None: iter(raw_markets))

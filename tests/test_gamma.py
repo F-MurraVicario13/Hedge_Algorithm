@@ -94,6 +94,7 @@ def test_fetch_event_markets(tmp_path, monkeypatch):
 
 def test_iter_closed_markets_paginates_until_short_page(tmp_path, monkeypatch):
     cache = DiskCache(cache_dir=tmp_path, min_interval=0.0)
+    monkeypatch.setattr(DiskCache, "has_json", lambda self, key: True)
     pages = {
         0: [make_raw_market(slug=f"m{i}") for i in range(3)],
         3: [make_raw_market(slug="m3")],  # short page -> stop
@@ -111,6 +112,7 @@ def test_iter_closed_markets_paginates_until_short_page(tmp_path, monkeypatch):
 
 def test_iter_closed_markets_stops_on_empty_page(tmp_path, monkeypatch):
     cache = DiskCache(cache_dir=tmp_path, min_interval=0.0)
+    monkeypatch.setattr(DiskCache, "has_json", lambda self, key: True)
     monkeypatch.setattr(gamma, "_request", lambda path, params: [])
 
     results = list(gamma.iter_closed_markets(cache, page_size=100))

@@ -122,12 +122,11 @@ def iter_closed_markets(
     offset = 0
     pages = 0
     while max_pages is None or pages < max_pages:
-        try:
-            page = _get(cache, "/markets", {**params, "offset": offset})
-        except RuntimeError as e:
-            if "offset too large" in str(e):
-                return
-            raise
+        page_params = {**params, "offset": offset}
+        key = f"gamma_markets_{urllib.parse.urlencode(sorted(page_params.items()))}"
+        if not cache.has_json(key):
+            return
+        page = _get(cache, "/markets", page_params)
         if not page:
             return
         for m in page:

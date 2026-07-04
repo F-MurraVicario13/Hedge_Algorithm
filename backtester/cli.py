@@ -16,11 +16,11 @@ from __future__ import annotations
 
 import argparse
 import sys
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from backtester.costs.model import CostModel
 from backtester.data.cache import DEFAULT_CACHE_DIR, DiskCache
-from backtester.data.clob import fetch_price_history
+from backtester.data.clob import fetch_price_history, history_cache_key
 from backtester.data.gamma import iter_closed_markets
 from backtester.engine.backtest import MarketData, simulate_all
 from backtester.engine.metrics import (
@@ -83,7 +83,7 @@ def build_market_dataset(
     limit: int,
     interval: str,
     fidelity: Optional[int],
-) -> Tuple[List[MarketData], Dict[str, int]]:
+) -> Tuple[List[MarketData], Dict[str, Any]]:
     """Pull resolved binary markets and their price history, skipping anything that doesn't fit cleanly."""
     extra = dict(gamma_params)
     if sport:
@@ -95,29 +95,44 @@ def build_market_dataset(
         "unresolved": 0,
         "too_short_history": 0,
         "history_fetch_failed": 0,
+        "history_not_cached": 0,
+        "samples": [],
     }
+
+    def record(reason: str, raw: dict, detail: str = "") -> None:
+        skipped[reason] += 1
+        if len(skipped["samples"]) < 8:
+            label = raw.get("slug") or raw.get("question") or str(raw.get("id"))
+            skipped["samples"].append(
+                f"{reason}: {label}" + (f" [{detail}]" if detail else "")
+            )
 
     for raw in iter_closed_markets(cache, extra_params=extra, page_size=100):
         if len(markets) >= limit:
             break
         if len(raw["clob_token_ids"]) != 2 or len(raw["outcome_prices"]) != 2:
-            skipped["not_binary"] += 1
+            record("not_binary", raw, f"token_ids={len(raw['clob_token_ids'])} outcome_prices={len(raw['outcome_prices'])}")
             continue
         try:
             resolved_idx = resolve_binary_outcome(raw["outcome_prices"])
         except ValueError:
-            skipped["unresolved"] += 1
+            record("unresolved", raw, f"outcome_prices={raw['outcome_prices']!r}")
             continue
 
         tok0, tok1 = raw["clob_token_ids"]
+        key0 = history_cache_key(tok0, interval=interval, fidelity=fidelity)
+        key1 = history_cache_key(tok1, interval=interval, fidelity=fidelity)
+        if not cache.has_json(key0) or not cache.has_json(key1):
+            record("history_not_cached", raw, f"tok0={tok0} tok1={tok1}")
+            continue
         try:
             hist0 = fetch_price_history(cache, tok0, interval=interval, fidelity=fidelity)
             hist1 = fetch_price_history(cache, tok1, interval=interval, fidelity=fidelity)
-        except Exception:
-            skipped["history_fetch_failed"] += 1
+        except Exception as e:
+            record("history_fetch_failed", raw, str(e))
             continue
         if len(hist0) < 2 or len(hist1) < 2:
-            skipped["too_short_history"] += 1
+            record("too_short_history", raw, f"hist0={len(hist0)} hist1={len(hist1)}")
             continue
 
         markets.append(MarketData(
@@ -157,8 +172,14 @@ def main(argv=None) -> None:
     markets, skipped = build_market_dataset(
         cache, args.sport, gamma_params, args.limit, args.interval, args.fidelity,
     )
-    print(f"Loaded {len(markets)} usable markets. Skipped: {skipped}", file=sys.stderr)
+    skipped_counts = {k: v for k, v in skipped.items() if k != "samples"}
+    print(f"Loaded {len(markets)} usable markets. Skipped: {skipped_counts}", file=sys.stderr)
     if not markets:
+        samples = skipped.get("samples", [])
+        if samples:
+            print("Sample skips:", file=sys.stderr)
+            for item in samples:
+                print(f"  {item}", file=sys.stderr)
         print("No usable markets found -- nothing to backtest.", file=sys.stderr)
         return
 
